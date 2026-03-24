@@ -4,10 +4,11 @@ from datetime import datetime
 import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
-from airflow.operators.python import PythonOperator
-from airflow.providers.google.cloud.hooks.gcs import GCSHook
 
 from airflow import DAG
+from airflow.providers.standard.operators.python import PythonOperator
+from airflow.providers.google.cloud.hooks.gcs import GCSHook
+
 
 default_args = {
     "start_date": datetime(2023, 1, 1),
@@ -28,29 +29,34 @@ def generate_parquet():
 
 
 def upload_to_gcs():
-    hook = GCSHook(gcp_conn_id="gcpdemo")
+    hook = GCSHook(
+        gcp_conn_id="google_cloud_default",
+    )
+
     hook.upload(
         bucket_name=BUCKET_NAME,
         object_name=DESTINATION_BLOB_NAME,
         filename=PARQUET_FILE,
-        mime_type="application/octet-stream"
+        mime_type="application/octet-stream",
     )
-    # Optional cleanup
+
     os.remove(PARQUET_FILE)
 
 
-with DAG("parquet_to_gcs",
-         default_args=default_args,
-         catchup=False) as dag:
+with DAG(
+    "parquet_to_gcs",
+    default_args=default_args,
+    catchup=False,
+) as dag:
 
     task_generate = PythonOperator(
         task_id="generate_parquet",
-        python_callable=generate_parquet
+        python_callable=generate_parquet,
     )
 
     task_upload = PythonOperator(
         task_id="upload_to_gcs",
-        python_callable=upload_to_gcs
+        python_callable=upload_to_gcs,
     )
 
     task_generate >> task_upload
